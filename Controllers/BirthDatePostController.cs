@@ -1,4 +1,5 @@
-﻿using AgeCalculator;
+﻿//Task 46
+using AgeCalculator;
 using Microsoft.AspNetCore.Mvc;
 
 namespace JoVision_Backend_tasks.Controllers
@@ -16,7 +17,7 @@ namespace JoVision_Backend_tasks.Controllers
     public class BirthDatePostController : ControllerBase
     {
         [HttpPost] // Changed from HttpGet
-        public IActionResult Calculate([FromForm] AgeCalculationRequest request)
+        public IActionResult Calculate([FromForm] AgeCalculationRequest request) //FromBody can also be used and it accept json data, but I used FromForm to accept form data
         {
             string? name = request.Name;
             int? years = request.Years;
