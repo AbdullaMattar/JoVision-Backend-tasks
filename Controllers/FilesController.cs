@@ -112,7 +112,7 @@ namespace JoVision_Backend_tasks.Controllers
                 return BadRequest("Error happened while deleting the file");
             }
 
-            return StatusCode(201, "Image and metadata deleted successfully.");
+            return Ok("Image and metadata deleted successfully.");
         }
 
         [HttpPost("Update")]
