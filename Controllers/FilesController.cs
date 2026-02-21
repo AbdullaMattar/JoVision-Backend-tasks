@@ -93,7 +93,6 @@ namespace JoVision_Backend_tasks.Controllers
                 return BadRequest($"File {imagePath} dosn't exist");
             }
             // check the owner
-            bool isValid = false;
             var jsonPath = Path.ChangeExtension(imagePath, ".json");
             var jsonfile = "";
             ImageMetadata? jsonContent = null;
@@ -121,6 +120,80 @@ namespace JoVision_Backend_tasks.Controllers
             }
 
             return StatusCode(201, "Image and metadata deleted successfully.");
+        }
+
+        [HttpPost("Update")]
+        public IActionResult UpdateFile([FromForm] ImageUploadRequest request)
+        {
+            IFormFile? file = request.File;
+            string? owner = request.Owner;
+
+            // 1.Create the UploadedFiles directory if it doesn't exist
+            if (!Directory.Exists(_storagePath))
+            {
+                Directory.CreateDirectory(_storagePath);
+            }
+
+            // 2.Check  the file is null or empty
+            if (file == null || file.Length == 0)
+            {
+                return BadRequest("No file uploaded.");
+            }
+            // 3. ensure file extension is ".jpg".
+            if (Path.GetExtension(file.FileName).ToLower() != ".jpg")
+            {
+                return BadRequest("Only .jpg files are allowed.");
+            }
+
+            // 4. Check if a file with this name already exists in _storagePath.
+            var safeFileName = Path.GetFileName(file.FileName);
+            var fullPathToFile = Path.Combine(_storagePath, safeFileName);
+            if (!System.IO.File.Exists(fullPathToFile))
+            {
+                return BadRequest($"File {fullPathToFile} dosn't exist");
+            }
+
+            // check the owner
+            var jsonPath = Path.ChangeExtension(fullPathToFile, ".json");
+            var jsonfile = "";
+            ImageMetadata? jsonContent = null;
+            try
+            {
+                jsonfile = System.IO.File.ReadAllText(jsonPath);
+                jsonContent = JsonSerializer.Deserialize<ImageMetadata>(jsonfile);
+            }
+            catch
+            {
+                return BadRequest("Error reading the json file");
+            }
+            if (owner != jsonContent.Owner)
+            { return StatusCode(403, "Forbidden: File Owner is Wrong"); }
+
+            // 5. Update the file.
+            try
+            {
+                using (var stream = new FileStream(fullPathToFile, FileMode.Create))
+                    file.CopyTo(stream);
+            }
+            catch { return BadRequest("Error happened while saving the file"); }
+            // 6. update the metadata object
+            var metadata = new ImageMetadata
+            {
+                Owner = owner,
+                CreationTime = jsonContent.CreationTime,
+                LastModificationTime = DateTime.UtcNow
+            };
+
+            // 7. Convert to a JSON string
+            try
+            {
+                var json = JsonSerializer.Serialize(metadata);
+
+                // 8. Write the string to the file system.
+                System.IO.File.WriteAllText(jsonPath, json);
+            }
+            catch { return BadRequest("Error happened while saving the json"); }
+            return Ok ("Image and metadata saved successfully.");
         }
     }
 }
