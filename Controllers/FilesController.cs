@@ -42,30 +42,85 @@ namespace JoVision_Backend_tasks.Controllers
             }
 
             // 5. Save the file.
-            try { 
-            using (var stream = new FileStream(fullPathToFile, FileMode.Create))
-                file.CopyTo(stream);
-            } catch { return BadRequest("Error happened while saving the file"); }
+            try
+            {
+                using (var stream = new FileStream(fullPathToFile, FileMode.Create))
+                    file.CopyTo(stream);
+            }
+            catch { return BadRequest("Error happened while saving the file"); }
             // 6. Create the metadata object
             var metadata = new ImageMetadata
             {
-                Owner = owner ,
+                Owner = owner,
                 CreationTime = DateTime.UtcNow,
                 LastModificationTime = DateTime.UtcNow
             };
 
             // 7. Convert to a JSON string
-            try { 
-            var json = JsonSerializer.Serialize(metadata);
+            try
+            {
+                var json = JsonSerializer.Serialize(metadata);
 
-            // 8. Define the path for the JSON file.
-            var jsonPath = Path.ChangeExtension(fullPathToFile, ".json");
+                // 8. Define the path for the JSON file.
+                var jsonPath = Path.ChangeExtension(fullPathToFile, ".json");
 
-            // 9. Write the string to the file system.
-            System.IO.File.WriteAllText(jsonPath, json);
+                // 9. Write the string to the file system.
+                System.IO.File.WriteAllText(jsonPath, json);
             }
             catch { return BadRequest("Error happened while saving the json"); }
             return StatusCode(201, "Image and metadata saved successfully.");
+        }
+
+        [HttpGet("Delete")]
+        public IActionResult DeleteFile([FromQuery] string? FileName, [FromQuery] string? FileOwner)
+        {
+            if (string.IsNullOrWhiteSpace(FileName) || string.IsNullOrWhiteSpace(FileOwner))
+            { return BadRequest("File Name or Owner can't be empty"); }
+
+            // Check if a file with this name already exists in _storagePath.
+            var filePath = Path.Combine(_storagePath, FileName);
+            var imagePath = filePath;
+            if (Path.HasExtension(filePath) && Path.GetExtension(filePath).ToLower() == ".jpg")
+            {
+                imagePath = filePath;
+            }
+            else
+            {
+                imagePath = Path.ChangeExtension(filePath, ".jpg");
+            }
+            if (!System.IO.File.Exists(imagePath))
+            {
+                return BadRequest($"File {imagePath} dosn't exist");
+            }
+            // check the owner
+            bool isValid = false;
+            var jsonPath = Path.ChangeExtension(imagePath, ".json");
+            var jsonfile = "";
+            ImageMetadata? jsonContent = null;
+            try
+            {
+                jsonfile = System.IO.File.ReadAllText(jsonPath);
+                jsonContent = JsonSerializer.Deserialize<ImageMetadata>(jsonfile);
+            }
+            catch
+            {
+                return BadRequest("Error reading the json file");
+            }
+            if (FileOwner != jsonContent.Owner)
+            { return BadRequest("File Owner is Wrong"); }
+
+            //delete the file
+            try
+            {
+                System.IO.File.Delete(imagePath);
+                System.IO.File.Delete(jsonPath);
+            }
+            catch
+            {
+                return BadRequest("Error happened while deleting the file");
+            }
+
+            return StatusCode(201, "Image and metadata deleted successfully.");
         }
     }
 }
