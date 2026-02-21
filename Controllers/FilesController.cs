@@ -80,14 +80,7 @@ namespace JoVision_Backend_tasks.Controllers
             // Check if a file with this name already exists in _storagePath.
             var filePath = Path.Combine(_storagePath, FileName);
             var imagePath = filePath;
-            if (Path.HasExtension(filePath) && Path.GetExtension(filePath).ToLower() == ".jpg")
-            {
-                imagePath = filePath;
-            }
-            else
-            {
-                imagePath = Path.ChangeExtension(filePath, ".jpg");
-            }
+
             if (!System.IO.File.Exists(imagePath))
             {
                 return BadRequest($"File {imagePath} dosn't exist");
@@ -193,7 +186,52 @@ namespace JoVision_Backend_tasks.Controllers
                 System.IO.File.WriteAllText(jsonPath, json);
             }
             catch { return BadRequest("Error happened while saving the json"); }
-            return Ok ("Image and metadata saved successfully.");
+            return Ok("Image and metadata saved successfully.");
+        }
+
+        [HttpGet("Retrieve")]
+        public IActionResult RetrieveFile([FromQuery] string? FileName, [FromQuery] string? FileOwner)
+        {
+            if (string.IsNullOrWhiteSpace(FileName) || string.IsNullOrWhiteSpace(FileOwner))
+            { return BadRequest("File Name or Owner can't be empty"); }
+
+            // Check if a file with this name already exists in _storagePath.
+
+            var safeFileName = Path.GetFileName(FileName);
+            var filePath = Path.Combine(_storagePath, safeFileName);
+
+            if (!System.IO.File.Exists(filePath))
+            {
+                return NotFound($"File {filePath} dosn't exist");
+            }
+            // check the owner
+            var jsonPath = Path.ChangeExtension(filePath, ".json");
+            var jsonfile = "";
+            ImageMetadata? jsonContent = null;
+            try
+            {
+                jsonfile = System.IO.File.ReadAllText(jsonPath);
+                jsonContent = JsonSerializer.Deserialize<ImageMetadata>(jsonfile);
+            }
+            catch
+            {
+                return BadRequest("Error reading the json file");
+            }
+            if (FileOwner != jsonContent.Owner)
+            { return StatusCode(403, "Forbidden: File Owner is Wrong"); }
+
+            //Retrieve the file
+            var image = new byte[0];
+            try
+            {
+                image = System.IO.File.ReadAllBytes(filePath);
+            }
+            catch
+            {
+                return BadRequest("Error happened while reading the file");
+            }
+
+            return File(image, "img/jpeg", FileName);
         }
     }
 }
