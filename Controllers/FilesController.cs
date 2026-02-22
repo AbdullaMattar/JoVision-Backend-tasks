@@ -369,7 +369,7 @@ namespace JoVision_Backend_tasks.Controllers
                     return BadRequest($"Error adding {item.FileName}");
                 }
             }
-
+            // print the new owner files
             var finalResult = filesMetadata
                 .Where(x => x.Metadata.Owner == NewOwner)
                 .Select(x => new FilterResponse
