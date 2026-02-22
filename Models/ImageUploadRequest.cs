@@ -15,4 +15,26 @@ namespace JoVision_Backend_tasks.Models
         public DateTime CreationTime { get; set; }
         public DateTime LastModificationTime { get; set; }
     }
+
+    public enum FileFilterType
+    {
+        ByModificationDate,
+        ByCreationDateDescending,
+        ByCreationDateAscending,
+        ByOwner
+    }
+
+    public class FilterRequest
+    {
+        public DateTime? CreationDate { get; set; }
+        public DateTime? ModificationDate { get; set; }
+        public string? Owner { get; set; }
+        public FileFilterType? FilterType { get; set; }
+    }
+
+    public class FilterResponse
+    {
+        public string FileName { get; set; } = string.Empty;
+        public string OwnerName { get; set; } = string.Empty;
+    }
 }

@@ -1,7 +1,8 @@
-﻿using Microsoft.AspNetCore.Mvc;
-using JoVision_Backend_tasks.Models;
+﻿using JoVision_Backend_tasks.Models;
+using Microsoft.AspNetCore.Mvc;
 using System.IO;
 using System.Text.Json;
+using static System.Net.WebRequestMethods;
 
 namespace JoVision_Backend_tasks.Controllers
 {
@@ -232,6 +233,88 @@ namespace JoVision_Backend_tasks.Controllers
             }
 
             return File(image, "img/jpeg", FileName);
+        }
+
+        [HttpPost("Filter")]
+        public IActionResult Filter([FromForm] FilterRequest request)
+        {
+            string? owner = request.Owner;
+            FileFilterType? filterType = request.FilterType;
+            DateTime? creationDate = request.CreationDate;
+            DateTime? modificationDate = request.ModificationDate;
+
+            //check for valid filter type
+            if (filterType == null || !Enum.IsDefined(typeof(FileFilterType), filterType))
+            {
+                return BadRequest("Invalid or missing filter type.");
+            }
+
+            // 1. Create the UploadedFiles directory if it doesn't exist
+            if (!Directory.Exists(_storagePath))
+            {
+                Directory.CreateDirectory(_storagePath);
+            }
+            // 2. Get all .json files in the directory
+            var jsonFiles = Directory.GetFiles(_storagePath, "*.json");
+            // get files metadata
+            var filesMetadata = new List<(string FileName, ImageMetadata Metadata)>();
+
+            foreach (var jsonFile in jsonFiles)
+            {
+                try
+                {
+                    var jsonContent = System.IO.File.ReadAllText(jsonFile);
+                    var metadata = JsonSerializer.Deserialize<ImageMetadata>(jsonContent);
+                    if (metadata != null)
+                    {
+                        filesMetadata.Add((Path.GetFileNameWithoutExtension(jsonFile), metadata));
+                    }
+                }
+                catch
+                {
+                    return BadRequest($"Error reading the json file {jsonFile}");
+                }
+            }
+            // 3. Filter the files based on the request parameters
+            IEnumerable<(string FileName, ImageMetadata Metadata)> filteredData = filesMetadata;
+
+            switch (request.FilterType)
+            {
+                case FileFilterType.ByModificationDate:
+
+                    if (request.ModificationDate == null) return BadRequest("ModificationDate is required for this filter.");
+
+                    filteredData = filteredData.Where(x => x.Metadata.LastModificationTime < request.ModificationDate.Value);
+                    break;
+
+                case FileFilterType.ByCreationDateDescending:
+                    if (request.CreationDate == null) return BadRequest("CreationDate is required for this filter.");
+                    filteredData = filteredData.Where(x => x.Metadata.CreationTime > request.CreationDate.Value);
+                    filteredData = filteredData.OrderByDescending(x => x.Metadata.CreationTime);
+                    break;
+
+                case FileFilterType.ByCreationDateAscending:
+                    if (request.CreationDate == null) return BadRequest("CreationDate is required for this filter.");
+                    filteredData = filteredData.Where(x => x.Metadata.CreationTime > request.CreationDate.Value);
+                    filteredData = filteredData.OrderBy(x => x.Metadata.CreationTime);
+                    break;
+
+                case FileFilterType.ByOwner:
+                    if (string.IsNullOrWhiteSpace(request.Owner)) return BadRequest("Owner is required for this filter.");
+                    filteredData = filteredData.Where(x => x.Metadata.Owner == request.Owner);
+                    break;
+
+                default:
+                    return BadRequest("FilterType is invalid");
+            }
+            // 4. Return the filtered list of files with their metadata
+            var finalResult = filteredData.Select(x => new FilterResponse
+            {
+                FileName = x.FileName,
+                OwnerName = x.Metadata.Owner
+            }).ToList();
+
+            return Ok(finalResult);
         }
     }
 }
