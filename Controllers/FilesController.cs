@@ -316,5 +316,69 @@ namespace JoVision_Backend_tasks.Controllers
 
             return Ok(finalResult);
         }
+
+        [HttpGet("TransferOwnership")]
+        public IActionResult TransferOwnership([FromQuery] string? OldOwner, [FromQuery] string? NewOwner)
+        {
+            if (string.IsNullOrWhiteSpace(OldOwner) || string.IsNullOrWhiteSpace(NewOwner))
+            { return BadRequest("NewOwner or OldOwner can't be empty"); }
+
+            // read all files
+            var jsonFiles = Directory.GetFiles(_storagePath, "*.json");
+            // get files metadata
+            var filesMetadata = new List<(string FileName, ImageMetadata Metadata)>();
+
+            foreach (var jsonFile in jsonFiles)
+            {
+                try
+                {
+                    var jsonContent = System.IO.File.ReadAllText(jsonFile);
+                    var metadata = JsonSerializer.Deserialize<ImageMetadata>(jsonContent);
+                    if (metadata != null)
+                    {
+                        filesMetadata.Add((Path.GetFileNameWithoutExtension(jsonFile), metadata));
+                    }
+                }
+                catch
+                {
+                    return BadRequest($"Error reading the json file {jsonFile}");
+                }
+            }
+            // check if old Owner Has Files
+            var oldOwnerFiles = filesMetadata.Where(x => OldOwner == x.Metadata.Owner);
+
+            if (oldOwnerFiles.Count() == 0) return NotFound($"old owner {OldOwner} has no files");
+
+            var transferred = new List<ImageMetadata>();
+            var failed = new List<string>();
+            //change owner of old files
+            foreach ((string FileName, ImageMetadata Metadata) item in oldOwnerFiles)
+            {
+                var jsonPath = Path.Combine(_storagePath, item.FileName + ".json");
+                try
+                {
+                    item.Metadata.Owner = NewOwner;
+                    item.Metadata.LastModificationTime = DateTime.UtcNow;
+
+                    var json = JsonSerializer.Serialize(item.Metadata);
+                    System.IO.File.WriteAllText(jsonPath, json);
+                }
+                catch
+                {
+                    item.Metadata.Owner = OldOwner;
+                    return BadRequest($"Error adding {item.FileName}");
+                }
+            }
+
+            var finalResult = filesMetadata
+                .Where(x => x.Metadata.Owner == NewOwner)
+                .Select(x => new FilterResponse
+                {
+                    FileName = x.FileName,
+                    OwnerName = x.Metadata.Owner
+                }).ToList();
+
+            return Ok(finalResult);
+        }
     }
 }
