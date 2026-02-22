@@ -232,7 +232,7 @@ namespace JoVision_Backend_tasks.Controllers
                 return BadRequest("Error happened while reading the file");
             }
 
-            return File(image, "img/jpeg", FileName);
+            return File(image, "image/jpeg", FileName);
         }
 
         [HttpPost("Filter")]
